@@ -40,16 +40,26 @@
 
   let assignments=null;
   let revealed={};
+  let generatedAt=null;
+
+  const viewModeMsg = document.getElementById('view-mode-msg');
+  const shareEl = document.getElementById('share');
+  const shareListEl = document.getElementById('share-list');
 
   const cardsEl = document.getElementById('cards');
   const atEl = document.getElementById('generated-at');
   const btnGen = document.getElementById('btn-generate');
   const btnReset = document.getElementById('btn-reset');
 
+  const hashParams = new URLSearchParams(location.hash.replace(/^#/,'') || '');
+  const rawPerson = hashParams.get('p');
+  const viewerName = rawPerson && NAMES.includes(rawPerson) ? rawPerson : null;
+
   function renderCards(){
     cardsEl.innerHTML='';
-    const map = assignments || Object.fromEntries(NAMES.map(n=>[n,'—']))
-    NAMES.forEach(person=>{
+    const people = viewerName ? [viewerName] : NAMES;
+    const map = assignments || Object.fromEntries(people.map(n=>[n,'—']))
+    people.forEach(person=>{
       const isRevealed=!!revealed[person];
       const receiver = map[person];
       const card=document.createElement('button');
@@ -64,7 +74,45 @@
   }
 
   function setGeneratedAt(iso){ atEl.textContent = iso ? new Date(iso).toLocaleString() : '—'; }
-  function applySnapshot(map, t){ assignments = map; revealed = {}; setGeneratedAt(t); renderCards(); btnReset.disabled = !assignments; }
+  function renderShareLinks(){
+    if(!shareEl || !shareListEl) return;
+    shareEl.hidden = !assignments || !!viewerName;
+    if(shareEl.hidden) return;
+
+    const encoded = encodeState({map:assignments, t: generatedAt});
+    const base = location.href.split('#')[0];
+    shareListEl.innerHTML='';
+    NAMES.forEach(person=>{
+      const link = `${base}#a=${encoded}&p=${encodeURIComponent(person)}`;
+      const row = document.createElement('div');
+      row.className = 'share-row';
+      row.innerHTML = `<span class="label">${person}</span>
+                       <input type="text" readonly value="${link}" aria-label="Share link for ${person}" />
+                       <span class="pill">Personal link</span>`;
+      shareListEl.appendChild(row);
+    });
+  }
+
+  function updateViewMode(){
+    if(!viewModeMsg) return;
+    if(viewerName){
+      viewModeMsg.textContent = `You are viewing the card for ${viewerName}. Only this card can be revealed.`;
+    }else{
+      viewModeMsg.textContent = 'Click a card to reveal. Share links below to keep assignments secret.';
+    }
+  }
+
+  function applySnapshot(map, t){
+    assignments = map;
+    revealed = {};
+    generatedAt = t;
+    setGeneratedAt(t);
+    renderCards();
+    renderShareLinks();
+    btnReset.disabled = !assignments || !!viewerName;
+    btnGen.disabled = !!viewerName;
+    updateViewMode();
+  }
 
   btnGen.addEventListener('click',()=>{
     try{
@@ -81,10 +129,10 @@
   btnReset.addEventListener('click',()=>{ revealed={}; renderCards(); });
 
   (function restore(){
-    const hash = location.hash.replace(/^#/,'');
-    const params = new URLSearchParams(hash);
-    const a = params.get('a');
+    const a = hashParams.get('a');
+    if(rawPerson && !viewerName) showError(`Unknown person: ${rawPerson}`);
     if(a){ const snap = decodeState(a); if(snap) { applySnapshot(snap.map, snap.t); return; } }
+    updateViewMode();
     renderCards();
   })();
 
