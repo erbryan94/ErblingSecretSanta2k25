@@ -80,7 +80,7 @@
     if(shareEl.hidden) return;
 
     const encoded = encodeState({map:assignments, t: generatedAt});
-    const base = location.href.split('#')[0];
+    const base = `${location.origin}${location.pathname}`;
     shareListEl.innerHTML='';
     NAMES.forEach(person=>{
       const link = `${base}#a=${encoded}&p=${encodeURIComponent(person)}`;
@@ -119,7 +119,7 @@
       const map = derangement(NAMES);
       const t = new Date().toISOString();
       applySnapshot(map,t);
-      const base = location.href.split('#')[0];
+      const base = `${location.origin}${location.pathname}`;
       const encoded = encodeState({map,t});
       try{ history.replaceState(null,'',`${base}#a=${encoded}`); }
       catch(_){ location.hash = `a=${encoded}`; }
